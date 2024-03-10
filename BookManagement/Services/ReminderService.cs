@@ -46,7 +46,7 @@ namespace BookManagement.Services
                     var book = dbContext.Books.Find(BorrowEntry.BookID);
                     if (book == null)
                         return;
-                    await emailService.SendEmailAsync(user.Email, "Reminder: Return Book", $"Please return '{book.Title}' by tomorrow.");
+                    await emailService.SendEmailAsync(user.Email, "Reminder: Return Book", $"Please return '{book.Title}' by {BorrowEntry.BorrowedUntil.ToString("yyyy-MM-dd")}.");
                 }
             }
         }

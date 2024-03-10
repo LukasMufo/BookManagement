@@ -5,66 +5,73 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BookManagement.Services
 {
-    public interface IUserService
+    public interface IBookService
     {
-        Task<User> GetUserByIdAsync(int id);
-        Task<List<User>> GetUsersAsync();
-        Task<User> CreateUserAsync(User user);
-        Task<User> DeleteUserAsync(int id);
-        Task<User> UpdateUserAsync(int id, User user);
+        Task<Book> GetBookByIdAsync(int id);
+        Task<List<Book>> GetBooksAsync(bool borrowed);
+        Task<Book> CreateBookAsync(Book book);
+        Task<Book> DeleteBookAsync(int id);
+        Task<Book> UpdateBookAsync(int id, Book book);
     }
-    public class UserService : IUserService
+    public class BookService : IBookService
     {
         private readonly BookLibraryContext _context;
 
-        public UserService(BookLibraryContext context)
+        public BookService(BookLibraryContext context)
         {
             _context = context;
         }
 
-        public async Task<User> GetUserByIdAsync(int id)
+        public async Task<Book> GetBookByIdAsync(int id)
         {
-            var user = await _context.Users.FindAsync(id);
-            return user;
+            return await _context.Books.FindAsync(id);
         }
-        public async Task<List<User>> GetUsersAsync()
+
+        public async Task<List<Book>> GetBooksAsync(bool borrowed)
         {
-            var users = await _context.Users.ToListAsync();
-            return users;
+            List<BorrowedBook> borrowedBooks = await _context.BorrowedBooks.ToListAsync();
+            List<Book> books = await _context.Books.ToListAsync();
+
+            List<Book> result = books.Where(x =>
+                (borrowed && borrowedBooks.Any(b => b.BookID == x.ID)) ||
+                (!borrowed && !borrowedBooks.Any(b => b.BookID == x.ID))
+            ).ToList();
+
+            return result;
         }
-        public async Task<User> CreateUserAsync(User user)
+        public async Task<Book> CreateBookAsync(Book book)
         {
-            await _context.Users.AddAsync(user);
+            _context.Books.Add(book);
             await _context.SaveChangesAsync();
-            return user;
+            return book;
         }
-        public async Task<User> DeleteUserAsync(int id)
+        public async Task<Book> DeleteBookAsync(int id)
         {
-            var user = await _context.Users.FindAsync(id);
-            if (user == null)
-            {
-                throw new KeyNotFoundException($"User with ID {id} not found.");
-            }
+            var book = await _context.Books.FindAsync(id);
+            if (book == null)
+                return null; // Return null if the book does not exist
 
-            _context.Users.Remove(user);
+            _context.Books.Remove(book);
             await _context.SaveChangesAsync();
-            return user;
+            return book;
+
         }
-        public async Task<User> UpdateUserAsync(int id, User user)
+        public async Task<Book> UpdateBookAsync(int id, Book book)
         {
-            var existingUser = await _context.Users.FindAsync(id);
-            if (existingUser == null)
-            {
-                throw new KeyNotFoundException($"User with ID {id} not found.");
-            }
+            if (id <= 0)
+                return null; // Invalid book ID
 
-            existingUser.Name = user.Name;
-            existingUser.Email = user.Email;
+            var existingBook = await _context.Books.FindAsync(id);
+            if (existingBook == null)
+                return null; // Book not found
 
-            _context.Entry(existingUser).State = EntityState.Modified;
+            existingBook.Title = book.Title;
+            existingBook.Author = book.Author;
+
+            _context.Entry(existingBook).State = EntityState.Modified;
             await _context.SaveChangesAsync();
 
-            return existingUser;
+            return existingBook;
         }
     }
 }

@@ -51,7 +51,7 @@ namespace BookManagement.Services
             {
                 var borrowedBook = await _context.BorrowedBooks.FindAsync(bookId);
                 if (borrowedBook == null)
-                    throw new KeyNotFoundException($"User with ID {bookId} not found.");
+                    throw new KeyNotFoundException($"Borrowed entry with book ID {bookId} not found.");
 
                 _context.BorrowedBooks.Remove(borrowedBook);
                 await _context.SaveChangesAsync();
@@ -67,7 +67,7 @@ namespace BookManagement.Services
         {
             var find = await _context.BorrowedBooks.FindAsync(bookId);
             if (find == null)
-                throw new KeyNotFoundException($"User with ID {bookId} not found.");
+                throw new KeyNotFoundException($"Borrowed entry with book ID {bookId} not found.");
 
             find.BookID = borrow.BookID;
             find.UserID = borrow.UserID;
