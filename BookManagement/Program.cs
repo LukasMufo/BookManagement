@@ -27,21 +27,36 @@ builder.Services.AddSwaggerGen(a =>
     a.IncludeXmlComments(xmlPath);
 });
 
-// Configure the database context with SQLite
-builder.Services.AddDbContext<BookLibraryContext>(options =>
-{
-    var configuration = builder.Configuration.GetSection("ConnectionStrings");
-    var connectionString = configuration["DefaultConnection"];
-    options.UseSqlite(connectionString);
-});
+//Add service layer
+builder.Services.AddScoped<IBookService, BookService>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IBorrowedService, BorrowedService>();
 
-//Inject dependency for service that checks for borrowed books that are to be returned
-builder.Services.AddScoped<IEmailService, SmtpEmailService>();
-//Add custom service to check for borrowed books that are to be returned
-builder.Services.AddHostedService<ReminderService>();
+if (builder.Environment.IsEnvironment("Test"))
+{
+    builder.Services.AddDbContext<BookLibraryContext>(options =>
+    {
+        options.UseInMemoryDatabase("TestDatabase");
+    });
+    //do not use the email service in test environment
+}
+else
+{
+    // Configure the database context with SQLite
+    builder.Services.AddDbContext<BookLibraryContext>(options =>
+    {
+        var configuration = builder.Configuration.GetSection("ConnectionStrings");
+        var connectionString = configuration["DefaultConnection"];
+        options.UseSqlite(connectionString);
+    });
+    //Inject dependency for service that checks for borrowed books that are to be returned
+    builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+    //Add custom service to check for borrowed books that are to be returned
+    builder.Services.AddHostedService<ReminderService>();
+}
+
 /// use custom model binder for DateOnly as ASP.NET don't support binding for DateOnly
 builder.Services.AddControllers(options => { options.ModelBinderProviders.Insert(0, new DateOnlyModelBinderProvider()); });
-
 
 var app = builder.Build();
 if (app.Environment.IsDevelopment())
@@ -70,4 +85,6 @@ app.UseEndpoints(endpoints =>
 
 
 app.Run();
+
+public partial class Program { }
 

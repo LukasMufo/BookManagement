@@ -5,6 +5,7 @@ using BookManagement.DbContexts;
 using BookManagement.Models;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Swashbuckle.AspNetCore.Annotations;
+using BookManagement.Services;
 
 namespace BookManagement.Controllers
 {
@@ -13,17 +14,20 @@ namespace BookManagement.Controllers
     public class UsersController : ControllerBase
     {
         private readonly BookLibraryContext _context;
+        private readonly IUserService _userService;
+        private string StatusErrorMessage { get { return "An error occurred while performing this action: UNHANDLED ERROR"; } }
 
-        public UsersController(BookLibraryContext context)
+        public UsersController(BookLibraryContext context, IUserService userService)
         {
             _context = context;
+            _userService = userService;
         }
         /// <summary>
         /// Will get <see cref="User"/> base on provided ID
         /// </summary>
         /// <param name="id">ID of the user that should be returned</param>
         /// <returns>An action result with the requested <see cref="User"/>, or BadRequest if ID is not valid, or NotFound if <see cref="User"/> does not exists,
-        ///  or status code 500 with message body if something goes wrong</returns>
+        ///  or status code 500 with <see cref="StatusErrorMessage"/> if something goes wrong</returns>
         [HttpGet]
         [SwaggerOperation(Summary = "Retrieves a user by ID", Description = "Returns the user based on provided ID.")]
         public async Task<ActionResult<User>> GetUser([FromQuery] int id)
@@ -35,45 +39,45 @@ namespace BookManagement.Controllers
             }
             try
             {
-                var User = await _context.Users.FindAsync(id);
-                if (User == null)
+                var user = await _userService.GetUserByIdAsync(id);
+                if (user == null)
                     return NotFound();
 
-                return Ok(User);
+                return Ok(user);
             }
-            catch (Exception ex)
+            catch
             {
-                return StatusCode(500, "An error occurred while performing this action: UNHANDLED ERROR");
+                return StatusCode(500, StatusErrorMessage);
             }
 
         }
         /// <summary>
         /// Will get List of all <see cref="User"/> entries
         /// </summary>
-        /// <returns>An action result with the requested List of <see cref="User"/>, or status code 500 with message body if something goes wrong</returns>
+        /// <returns>An action result with the requested List of <see cref="User"/>, or status code 500 with <see cref="StatusErrorMessage"/> if something goes wrong</returns>
         [HttpGet("All")]
         [SwaggerOperation(Summary = "Retrieves all users")]
         public async Task<ActionResult<List<User>>> GetUsers()
         {
             try
             {
-                List<User> result = await _context.Users.ToListAsync();
-                return Ok(result);
+                var users = await _userService.GetUsersAsync();
+                return Ok(users);
             }
-            catch (Exception ex)
+            catch
             {
-                return StatusCode(500, "An error occurred while performing this action: UNHANDLED ERROR");
+                return StatusCode(500, StatusErrorMessage);
             }
         }
         /// <summary>
         /// Will create a new <see cref="User"/>
         /// </summary>
-        /// <param name="User">New <see cref="User"/> details</param>
+        /// <param name="user">New <see cref="User"/> details</param>
         /// <returns>An CreatedAtAction result with the newly created <see cref="User"/>, or BadRequest if user details are not valid, 
-        ///  or status code 500 with message body if something goes wrong</returns>
+        ///  or status code 500 with <see cref="StatusErrorMessage"/> if something goes wrong</returns>
         [HttpPost]
         [SwaggerOperation(Summary = "Creates new user", Description = "User details for the newly created user")]
-        public async Task<ActionResult<User>> CreateUser(User User)
+        public async Task<ActionResult<User>> CreateUser(User user)
         {
             if (!ModelState.IsValid)
             {
@@ -81,20 +85,19 @@ namespace BookManagement.Controllers
             }
             try
             {
-                await _context.Users.AddAsync(User);
-                await _context.SaveChangesAsync();
-                return CreatedAtAction(nameof(GetUser), new { id = User.ID }, User);
+                var createdUser = await _userService.CreateUserAsync(user);
+                return CreatedAtAction(nameof(GetUser), new { id = createdUser.ID }, createdUser);
             }
-            catch (Exception ex)
+            catch
             {
-                return StatusCode(500, "An error occurred while performing this action: UNHANDLED ERROR");
+                return StatusCode(500, StatusErrorMessage);
             }
         }
         /// <summary>
         /// Will Delete <see cref="User"/> by the provided ID
         /// </summary>
         /// <param name="id">Id of the <see cref="User"/> that shall be deleted</param>
-        /// <returns>An Ok action result if delete succedes, or BadRequest if ID is not valid, or NotFound if <see cref="User"/> does not exists, or status code 500 with message body if something goes wrong</returns>
+        /// <returns>An Ok action result if delete succedes, or BadRequest if ID is not valid, or NotFound if <see cref="User"/> does not exists, or status code 500 with <see cref="StatusErrorMessage"/> if something goes wrong</returns>
         [HttpDelete]
         [SwaggerOperation(Summary = "Deletes the user", Description = "Deletes the user based on ID")]
         public async Task<ActionResult<User>> DeleteUser([FromQuery] int id)
@@ -106,17 +109,16 @@ namespace BookManagement.Controllers
             }
             try
             {
-                var User = _context.Users.Find(id);
-                if (User == null)
-                    return NotFound();
-
-                _context.Users.Remove(User);
-                await _context.SaveChangesAsync();
-                return Ok("Successfuly deleted User with id=" + id);
+                var deletedUser = await _userService.DeleteUserAsync(id);
+                return Ok($"Successfully deleted User with id={deletedUser.ID}");
             }
-            catch (Exception ex)
+            catch (KeyNotFoundException ex)
             {
-                return StatusCode(500, "An error occurred while performing this action: UNHANDLED ERROR");
+                return NotFound(ex.Message);
+            }
+            catch
+            {
+                return StatusCode(500, StatusErrorMessage);
             }
         }
         /// <summary>
@@ -125,7 +127,7 @@ namespace BookManagement.Controllers
         /// <param name="id">ID of the <see cref="User"/> that shall be deleted</param>
         /// <param name="User"><see cref="User"/> details</param>
         /// <returns>An Ok action result with the updated <see cref="User"/>, or BadRequest if ID or the user details are not valid, or Not Found if such user does not exist, 
-        ///  or status code 500 with message body if something goes wrong</returns>
+        ///  or status code 500 with <see cref="StatusErrorMessage"/> if something goes wrong</returns>
         [HttpPut]
         public async Task<ActionResult<User>> UpdateUser([FromQuery] int id, User User)
         {
@@ -140,21 +142,18 @@ namespace BookManagement.Controllers
             }
             try
             {
-                var find = await _context.Users.FindAsync(id);
-                if (find == null)
-                    return NotFound();
+                var updatedUser = await _userService.UpdateUserAsync(id, User);
+                if (updatedUser == null)
+                {
+                    // Handle invalid model state
+                    return BadRequest(ModelState);
+                }
 
-                find.Name = User.Name;
-                find.Email = User.Email;
-
-                _context.Entry(find).State = EntityState.Modified;
-                await _context.SaveChangesAsync();
-
-                return Ok(find);
+                return Ok(updatedUser);
             }
-            catch (Exception ex)
+            catch
             {
-                return StatusCode(500, "An error occurred while performing this action: UNHANDLED ERROR");
+                return StatusCode(500, StatusErrorMessage);
             }
             
         }
